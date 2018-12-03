@@ -9,6 +9,20 @@ import (
 	"strings"
 )
 
+var (
+	foundchan = make(chan int, 1)
+	lastpool  []int
+)
+
+func searchLast(match int, last []int, foundchan chan int) {
+	for _, val := range last {
+		if match == val {
+			foundchan <- val
+		}
+	}
+	foundchan <- 0
+}
+
 func calibrate(inputFilename string) (int, error) {
 	file, err := os.Open(inputFilename)
 	if err != nil {
@@ -27,6 +41,11 @@ func calibrate(inputFilename string) (int, error) {
 				continue
 			}
 			freq -= change
+			if strings.Contains(strconv.Itoa(lastpool[:]), string(freq)) {
+				duperr := fmt.Errorf("duplicate found before before parsing finished")
+				return freq, duperr
+			}
+			lastpool = append(lastpool, freq)
 		}
 		if strings.ContainsRune(scanner.Text(), '+') {
 			change, err := strconv.Atoi(scanner.Text()[1:])
@@ -35,6 +54,7 @@ func calibrate(inputFilename string) (int, error) {
 				continue
 			}
 			freq += change
+			lastpool = append(lastpool, freq)
 		}
 	}
 	return freq, nil
