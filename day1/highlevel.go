@@ -1,6 +1,10 @@
-// This module contains packages build specifically to solve 2018's puzzles. By-and-for: kdevb0x
-// more info about adventofcode can be found at https://adventofcode.com
-//--- Copyright 2018 kdd | Licenced under MIT
+/* This module contains packages build specifically to solve 2018's puzzles
+*  more info about adventofcode can be found at https://adventofcode.com
+*
+*  Copyright 2018 kdevb0x Ltd. All rights reserved
+*  Use of this source code is governed by the BSD 3-Clause license
+*  The full license text can be found in the LICENSE file.
+ */
 
 package main
 
@@ -11,14 +15,15 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 )
 
 type FreqModule struct {
 	lowest, highest int
-	Visited         map[int]bool
+
+	// freq will set to false when seen the first time, true the 2nd.
+	Visited map[int]bool
 }
 
 func (p *FreqModule) scanForCollision(candidates chan int) (match <-chan int) {
@@ -26,17 +31,14 @@ func (p *FreqModule) scanForCollision(candidates chan int) (match <-chan int) {
 workque:
 	for i := range candidates {
 		if present, ok := p.Visited[i]; !ok {
-			p.Visited[i] = false
+			p.Visited[i] = true
 			break workque
 		} else {
 			switch present {
 			case false:
 				p.Visited[i] = true
-				break workque
-			case true:
 				matchChan <- i
-				close(matchChan)
-				break workque
+				match = matchChan
 			}
 
 		}
@@ -46,47 +48,43 @@ workque:
 }
 
 func (p *FreqModule) calibrateFromReader(b io.Reader, rolloverFreq int) (current chan int, err error) {
-	var currentFreq = make(chan int)
+	currentFreq := make(chan int)
+	current = currentFreq
 	var scanner = bufio.NewScanner(b)
-	var freq int = 0
+	var freq int
 
 	if rolloverFreq == 0 {
 	}
 	freq = rolloverFreq
 
-	for {
-		for scanner.Scan() {
-			if strings.ContainsRune(scanner.Text(), '-') {
-				change, err := strconv.Atoi(scanner.Text()[1:])
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				freq -= change
-				/*
-						if strings.Contains(strconv.Itoa(lastpool[:]), string(freq)) {
-							duperr := fmt.Errorf("duplicate found before before parsing finished")
-							return freq, duperr
-						}
-						lastpool = append(lastpool, freq)
-					}
-				*/
-			}
+	for scanner.Scan() {
 
-			if strings.ContainsRune(scanner.Text(), '+') {
-				change, err := strconv.Atoi(scanner.Text()[1:])
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				freq += change
+		// Subtract from the net freq
+		if strings.ContainsRune(scanner.Text(), '-') {
+			change, err := strconv.Atoi(scanner.Text()[1:])
+			if err != nil {
+				log.Println(err)
+				continue
 			}
-			currentFreq <- freq
+			freq -= change
 		}
+
+		// Add to the net freq
+		if strings.ContainsRune(scanner.Text(), '+') {
+			change, err := strconv.Atoi(scanner.Text()[1:])
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			freq += change
+		}
+		currentFreq <- freq
 	}
+
 	close(currentFreq)
 
-	return currentFreq, nil
+	err = nil
+	return
 
 }
 
@@ -95,8 +93,9 @@ type WatchDevice struct {
 	Freqs     *FreqModule
 }
 
+// NewWatchDevice creates our time-traveling device 
 func NewWatchDevice() *WatchDevice {
-	var m map[int]bool = make(map[int]bool)
+	var m = make(map[int]bool)
 	fm := &FreqModule{
 		highest: 0,
 		lowest:  0,
@@ -109,6 +108,7 @@ func NewWatchDevice() *WatchDevice {
 	return watch
 }
 
+// CalibrateFreqs does what it's name implies, reading input data from a file.
 func (d *WatchDevice) CalibrateFreqs() error {
 	caldata, err := ReadFileINTOBuffer(input)
 	if err != nil {
@@ -116,27 +116,28 @@ func (d *WatchDevice) CalibrateFreqs() error {
 		return err
 	}
 
-	for {
-		currentInt, _ := d.Freqs.calibrateFromReader(caldata, 0)
-		colide := d.Freqs.scanForCollision(currentInt)
-		select {
-		case <-currentInt:
-		case i := <-colide:
-			fmt.Printf("the first freq to show up twice was %s\n", i)
-		}
+	currentInt, _ := d.Freqs.calibrateFromReader(caldata, 0)
+	colide := d.Freqs.scanForCollision(currentInt)
+	select {
+	case <-currentInt:
+	case i := <-colide:
+		fmt.Printf("the first freq to show up twice was %d\n", i)
 	}
+
 	return nil
 
 }
 
-// ReadFile reads all data from 'filename' into a new bytes.Buffer and
-// then closes the file. Any err other than nil returns nil buf
+// ReadFileINTOBuffer reads all data from 'filename' into a new bytes.Buffer,
+// (cleanly opening and closing the file) returning a pointer to the Buffer.
+//
+// NOTE: If any non-nil errors are encountered, Buffer will be a nil pointer!!
 func ReadFileINTOBuffer(filename string) (*bytes.Buffer, error) {
 	var b []byte
 	buf := bytes.NewBuffer(b)
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Print("%s\n", err)
+		log.Printf("%s\n", err)
 		return nil, err
 	}
 	if read, err := buf.Write(file); err != nil || len(file) != read {

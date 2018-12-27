@@ -3,12 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
-	"strings"
 )
 
 func getBoundsFromFile(filename string) (high, low int) {
@@ -48,9 +45,9 @@ func main() {
 		fmt.Println(calibratedFreq)
 	*/
 	// Task2
-	highb, lowb := getBoundsFromFile(input)
-
-	var v map[int]bool = make(map[int]bool)
 
 	var device = NewWatchDevice()
+	if err := device.CalibrateFreqs(); err != nil {
+		log.Fatal(err)
+	}
 }
